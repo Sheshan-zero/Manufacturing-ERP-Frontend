@@ -13,9 +13,7 @@ import {
 } from "recharts";
 import "./styles.css";
 
-// -----------------------------------------------------------------------------
-// CONFIGURATION & DATA
-// -----------------------------------------------------------------------------
+
 const modules = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, category: null, permissionCode: "DASHBOARD" },
   { id: "inventory", label: "Items", icon: Archive, endpoint: "/api/items", key: "itemId", category: "Master Data", permissionCode: "ITEMS" },
@@ -192,9 +190,7 @@ const pageConfig = {
   payments: { title: "Payments", subtitle: "Payment activity from sales orders.", columns: ["paymentId", "salesOrderId", "paymentDate", "amount", "paymentMethod", "paymentStatus"], statusField: "paymentStatus" },
 };
 
-// -----------------------------------------------------------------------------
-// UTILITIES
-// -----------------------------------------------------------------------------
+
 function getToken() { return localStorage.getItem("erpToken") || ""; }
 async function api(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
@@ -304,9 +300,7 @@ async function downloadApiFile(path, fallbackName) {
   URL.revokeObjectURL(url);
 }
 
-// -----------------------------------------------------------------------------
-// COMPONENTS
-// -----------------------------------------------------------------------------
+
 function Badge({ value }) {
   const text = normalizeStatus(value);
   const low = text.toLowerCase();
@@ -916,9 +910,7 @@ function LoginPage({ onLogin }) {
   );
 }
 
-// -----------------------------------------------------------------------------
-// MAIN APP
-// -----------------------------------------------------------------------------
+
 function App() {
   const [active, setActive] = useState("dashboard");
   const [user, setUser] = useState(localStorage.getItem("erpUser") || "");
