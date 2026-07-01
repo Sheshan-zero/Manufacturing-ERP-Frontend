@@ -831,7 +831,7 @@ function LoginPage({ onLogin }) {
         </div>
         <div className="login-hero">
           <h1 className="login-hero-title">Streamline your<br />manufacturing operations</h1>
-          <p className="login-hero-desc">A unified platform for inventory, production, procurement, and sales — built for modern manufacturing teams.</p>
+          <p className="login-hero-desc">A unified platform for inventory, production, procurement, and sales built for modern manufacturing teams.</p>
           <div className="login-features">
             {[
               { icon: "📦", label: "Real-time inventory tracking" },
