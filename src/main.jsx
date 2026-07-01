@@ -200,7 +200,12 @@ async function api(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(path, { ...options, headers });
+  
+  // Use Azure backend URL in production, local proxy in development
+  const baseUrl = import.meta.env.PROD ? "https://manufacturing-erp-1782912681254.azurewebsites.net" : "";
+  const fullPath = path.startsWith("http") ? path : baseUrl + path;
+  
+  const response = await fetch(fullPath, { ...options, headers });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     throw new Error(`${response.status} ${response.statusText}${detail ? `: ${detail}` : ""}`);
