@@ -603,9 +603,16 @@ function ModalForm({ title, sections, onClose, onSave, initialValues = {} }) {
   );
 }
 
-function DataPage({ config, rows, refresh, loading, error, onCreate, onUpdate, onDelete, permissions = [], permissionCode }) {
+function DataPage({ config, pagePayload, refresh, loading, error, onCreate, onUpdate, onDelete, permissions = [], permissionCode }) {
   const [editing, setEditing] = useState(false);
   const [editingRow, setEditingRow] = useState(null);
+
+  const isPage = pagePayload && typeof pagePayload === 'object' && 'content' in pagePayload;
+  const rows = isPage ? pagePayload.content : (Array.isArray(pagePayload) ? pagePayload : []);
+  const totalPages = isPage ? pagePayload.totalPages : 1;
+  const pageNumber = isPage ? pagePayload.number : 0;
+  const totalElements = isPage ? pagePayload.totalElements : rows.length;
+  const pageSize = isPage ? pagePayload.size : rows.length || 10;
 
   const canCreate = !config.readOnly && config.allowCreate !== false && permissions.includes(`${permissionCode}:CREATE`);
   const canEdit = !config.readOnly && config.allowEdit !== false && permissions.includes(`${permissionCode}:EDIT`);
@@ -622,7 +629,7 @@ function DataPage({ config, rows, refresh, loading, error, onCreate, onUpdate, o
           {config.createLabel && canCreate && <button className="primary" onClick={() => { setEditingRow(null); setEditing(true); }}><Plus size={14} /> {config.createLabel}</button>}
           <div className="command-divider"></div>
           <button onClick={() => downloadCSV(`${config.title}.csv`, rows, config.columns)}><Download size={14} /> Export</button>
-          <button onClick={refresh}><RefreshCcw size={14} /> Refresh</button>
+          <button onClick={() => refresh(pageNumber, pageSize)}><RefreshCcw size={14} /> Refresh</button>
         </div>
       </div>
 
@@ -666,6 +673,37 @@ function DataPage({ config, rows, refresh, loading, error, onCreate, onUpdate, o
             {rows.length === 0 && <tr><td colSpan={config.columns.length} style={{ textAlign: "center", padding: "var(--space-4)" }}>{loading ? "Loading records..." : "No records found."}</td></tr>}
           </tbody>
         </table>
+        
+        {isPage && totalPages > 0 && (
+          <div className="pagination-controls" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px", borderTop: "1px solid var(--border)", background: "var(--surface)" }}>
+            <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Page {pageNumber + 1} of {totalPages} ({totalElements} total records)</span>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <select 
+                value={pageSize} 
+                onChange={(e) => refresh(0, Number(e.target.value))} 
+                style={{ padding: "4px", fontSize: 13, border: "1px solid var(--border)", borderRadius: "4px", backgroundColor: "var(--bg)", color: "var(--text)" }}
+              >
+                <option value={10}>10 per page</option>
+                <option value={20}>20 per page</option>
+                <option value={50}>50 per page</option>
+              </select>
+              <button 
+                disabled={pageNumber === 0} 
+                onClick={() => refresh(pageNumber - 1, pageSize)}
+                className="secondary mini"
+              >
+                Previous
+              </button>
+              <button 
+                disabled={pageNumber >= totalPages - 1} 
+                onClick={() => refresh(pageNumber + 1, pageSize)}
+                className="secondary mini"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {editing && (
@@ -678,7 +716,7 @@ function DataPage({ config, rows, refresh, loading, error, onCreate, onUpdate, o
             await onCreate(request);
           }
           setEditing(false);
-          refresh();
+          refresh(pageNumber, pageSize);
         }} />
       )}
     </div>
@@ -976,14 +1014,14 @@ function App() {
     }
   }
 
-  async function loadModule(moduleId = active) {
+  async function loadModule(moduleId = active, page = 0, size = 10) {
     if (moduleId === "dashboard") { await loadDashboard(); return; }
     const module = modules.find(item => item.id === moduleId);
     if (!module?.endpoint || !getToken()) return;
     setLoading(true);
     try {
-      const payload = await api(`${module.endpoint}?size=100`);
-      setData(current => ({ ...current, [moduleId]: pageContent(payload) }));
+      const payload = await api(`${module.endpoint}?page=${page}&size=${size}`);
+      setData(current => ({ ...current, [moduleId]: payload }));
       setErrors(current => ({ ...current, [moduleId]: "" }));
     } catch (error) {
       setErrors(current => ({ ...current, [moduleId]: `Backend API unavailable: ${error.message}. Showing sample data.` }));
@@ -1128,12 +1166,12 @@ function App() {
             </>
           )}
           {active === "reports" && <ReportsPage />}
-          {active === "users" && <UserAccessPage rows={data.users || []} refresh={() => loadModule("users")} loading={loading} error={errors.users} permissions={permissions} />}
+          {active === "users" && <UserAccessPage rows={pageContent(data.users)} refresh={() => loadModule("users")} loading={loading} error={errors.users} permissions={permissions} />}
           {pageConfig[active] && active !== "users" && (
             <DataPage
               config={{ ...pageConfig[active], key: activeModule?.key }}
-              rows={data[active] || []}
-              refresh={() => loadModule(active)}
+              pagePayload={data[active] || []}
+              refresh={(page, size) => loadModule(active, page, size)}
               loading={loading}
               error={errors[active]}
               onCreate={createRecord}
