@@ -316,6 +316,62 @@ function Badge({ value }) {
   return <span className={`badge ${tone}`}>{text}</span>;
 }
 
+function GlobalSearch({ modules, active, setActive, isOpen, setIsOpen }) {
+  const [query, setQuery] = useState("");
+  const inputRef = React.useRef(null);
+  
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    } else {
+      setQuery("");
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const filtered = modules.filter(m => 
+    m.label.toLowerCase().includes(query.toLowerCase()) || 
+    (m.category && m.category.toLowerCase().includes(query.toLowerCase()))
+  );
+
+  return (
+    <div className="modal-overlay" onClick={() => setIsOpen(false)} style={{ alignItems: 'flex-start', paddingTop: '10vh', zIndex: 9999 }}>
+      <div className="modal-panel" onClick={e => e.stopPropagation()} style={{ width: 500, padding: 0, boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '16px', borderBottom: '1px solid var(--border)' }}>
+          <Search size={20} color="var(--text-muted)" style={{ marginRight: 12 }} />
+          <input 
+            ref={inputRef}
+            value={query} 
+            onChange={e => setQuery(e.target.value)} 
+            placeholder="Search modules..." 
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 16, color: 'var(--text)' }}
+          />
+          <button className="icon-btn" onClick={() => setIsOpen(false)}><X size={18} /></button>
+        </div>
+        <div style={{ maxHeight: 400, overflowY: 'auto', padding: '8px' }}>
+          {filtered.length === 0 ? <div style={{ padding: 16, color: 'var(--text-muted)', textAlign: 'center' }}>No modules found</div> : null}
+          {filtered.map(m => (
+            <div 
+              key={m.id} 
+              onClick={() => { setActive(m.id); setIsOpen(false); }}
+              style={{ padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, borderRadius: 6 }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--surface-hover)'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <m.icon size={18} color="var(--primary)" />
+              <div>
+                <div style={{ fontWeight: 500 }}>{m.label}</div>
+                {m.category && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{m.category}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Sidebar({ active, setActive, permissions }) {
   const visibleModules = modules.filter(m => permissions.includes(`${m.permissionCode}:VIEW`));
   const categories = [...new Set(visibleModules.filter(m => m.category).map(m => m.category))];
@@ -351,6 +407,7 @@ function Sidebar({ active, setActive, permissions }) {
 }
 
 function Topbar({
+  setSearchOpen,
   user,
   role,
   openLogin,
@@ -368,9 +425,9 @@ function Topbar({
         <span className="module-name">{moduleName}</span>
       </div>
       <div className="topbar-center">
-        <div className="global-search">
+        <div className="global-search" onClick={() => setSearchOpen(true)} style={{ cursor: "pointer" }}>
           <Search size={16} />
-          <input placeholder="Search everywhere (Alt+Q)" />
+          <input placeholder="Search everywhere (Alt+Q)" readOnly style={{ cursor: "pointer" }} />
         </div>
       </div>
       <div className="topbar-right">
@@ -606,9 +663,14 @@ function ModalForm({ title, sections, onClose, onSave, initialValues = {} }) {
 function DataPage({ config, pagePayload, refresh, loading, error, onCreate, onUpdate, onDelete, permissions = [], permissionCode }) {
   const [editing, setEditing] = useState(false);
   const [editingRow, setEditingRow] = useState(null);
+  const [filterText, setFilterText] = useState("");
+  const [showFilter, setShowFilter] = useState(false);
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
 
   const isPage = pagePayload && typeof pagePayload === 'object' && 'content' in pagePayload;
-  const rows = isPage ? pagePayload.content : (Array.isArray(pagePayload) ? pagePayload : []);
+  const rawRows = isPage ? pagePayload.content : (Array.isArray(pagePayload) ? pagePayload : []);
+  const rows = rawRows.filter(row => !filterText || Object.values(row).some(val => String(val).toLowerCase().includes(filterText.toLowerCase())));
   const totalPages = isPage ? pagePayload.totalPages : 1;
   const pageNumber = isPage ? pagePayload.number : 0;
   const totalElements = isPage ? pagePayload.totalElements : rows.length;
@@ -629,7 +691,7 @@ function DataPage({ config, pagePayload, refresh, loading, error, onCreate, onUp
           {config.createLabel && canCreate && <button className="primary" onClick={() => { setEditingRow(null); setEditing(true); }}><Plus size={14} /> {config.createLabel}</button>}
           <div className="command-divider"></div>
           <button onClick={() => downloadCSV(`${config.title}.csv`, rows, config.columns)}><Download size={14} /> Export</button>
-          <button onClick={() => refresh(pageNumber, pageSize)}><RefreshCcw size={14} /> Refresh</button>
+          <button onClick={() => refresh(pageNumber, pageSize, sortCol ? `${sortCol},${sortDir}` : "")}><RefreshCcw size={14} /> Refresh</button>
         </div>
       </div>
 
@@ -637,15 +699,25 @@ function DataPage({ config, pagePayload, refresh, loading, error, onCreate, onUp
       <div className="table-container">
         <div className="table-toolbar">
           <div className="command-bar" style={{ border: "none", background: "transparent", padding: 0 }}>
-            <button><Filter size={14} /> Filter</button>
-            <button><SlidersHorizontal size={14} /> Sort</button>
+            <button className={showFilter ? "active" : ""} onClick={() => { setShowFilter(!showFilter); if(showFilter) setFilterText(""); }}><Filter size={14} /> Filter</button>
+            <button onClick={() => { setSortCol(null); refresh(pageNumber, pageSize, ""); }}><SlidersHorizontal size={14} /> Reset Sort</button>
+            {showFilter && <input autoFocus value={filterText} onChange={e => setFilterText(e.target.value)} placeholder="Filter current page..." style={{ padding: "4px 8px", fontSize: 13, border: "1px solid var(--border)", borderRadius: "4px", marginLeft: "8px" }} />}
           </div>
           <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{loading ? "Loading..." : `${rows.length} records`}</span>
         </div>
         <table>
           <thead>
             <tr>
-              {config.columns.map(col => <th key={col}>{labelize(col)}</th>)}
+              {config.columns.map(col => (
+                <th key={col} style={{ cursor: "pointer" }} onClick={() => {
+                  const newDir = sortCol === col && sortDir === "asc" ? "desc" : "asc";
+                  setSortCol(col);
+                  setSortDir(newDir);
+                  refresh(pageNumber, pageSize, `${col},${newDir}`);
+                }}>
+                  {labelize(col)} {sortCol === col ? (sortDir === "asc" ? "↑" : "↓") : ""}
+                </th>
+              ))}
               {(canEdit || canDelete) && <th>Actions</th>}
             </tr>
           </thead>
@@ -680,7 +752,7 @@ function DataPage({ config, pagePayload, refresh, loading, error, onCreate, onUp
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <select 
                 value={pageSize} 
-                onChange={(e) => refresh(0, Number(e.target.value))} 
+                onChange={(e) => refresh(0, Number(e.target.value), sortCol ? `${sortCol},${sortDir}` : "")} 
                 style={{ padding: "4px", fontSize: 13, border: "1px solid var(--border)", borderRadius: "4px", backgroundColor: "var(--bg)", color: "var(--text)" }}
               >
                 <option value={10}>10 per page</option>
@@ -689,14 +761,14 @@ function DataPage({ config, pagePayload, refresh, loading, error, onCreate, onUp
               </select>
               <button 
                 disabled={pageNumber === 0} 
-                onClick={() => refresh(pageNumber - 1, pageSize)}
+                onClick={() => refresh(pageNumber - 1, pageSize, sortCol ? `${sortCol},${sortDir}` : "")}
                 className="secondary mini"
               >
                 Previous
               </button>
               <button 
                 disabled={pageNumber >= totalPages - 1} 
-                onClick={() => refresh(pageNumber + 1, pageSize)}
+                onClick={() => refresh(pageNumber + 1, pageSize, sortCol ? `${sortCol},${sortDir}` : "")}
                 className="secondary mini"
               >
                 Next
@@ -716,7 +788,7 @@ function DataPage({ config, pagePayload, refresh, loading, error, onCreate, onUp
             await onCreate(request);
           }
           setEditing(false);
-          refresh(pageNumber, pageSize);
+          refresh(pageNumber, pageSize, sortCol ? `${sortCol},${sortDir}` : "");
         }} />
       )}
     </div>
@@ -952,12 +1024,14 @@ function LoginPage({ onLogin }) {
   );
 }
 
-
 function App() {
   const [active, setActive] = useState("dashboard");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [user, setUser] = useState(localStorage.getItem("erpUser") || "");
   const [role, setRole] = useState((localStorage.getItem("erpRole") || "").replace(/^ROLE_/, ""));
-  const [permissions, setPermissions] = useState(JSON.parse(localStorage.getItem("erpPermissions") || "[]"));
+  const [permissions, setPermissions] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("erpPermissions")) || []; } catch { return []; }
+  });
   const [authenticated, setAuthenticated] = useState(!!getToken());
   const [data, setData] = useState(samples);
   const [notifications, setNotifications] = useState([]);
@@ -967,6 +1041,17 @@ function App() {
   const [sessionMessage, setSessionMessage] = useState("");
 
   const activeModule = modules.find(m => m.id === active);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.altKey && e.key.toLowerCase() === 'q') {
+        e.preventDefault();
+        setSearchOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   async function loadNotifications() {
     if (!getToken()) return [];
@@ -1014,13 +1099,14 @@ function App() {
     }
   }
 
-  async function loadModule(moduleId = active, page = 0, size = 10) {
+  async function loadModule(moduleId = active, page = 0, size = 10, sort = "") {
     if (moduleId === "dashboard") { await loadDashboard(); return; }
     const module = modules.find(item => item.id === moduleId);
     if (!module?.endpoint || !getToken()) return;
     setLoading(true);
     try {
-      const payload = await api(`${module.endpoint}?page=${page}&size=${size}`);
+      const sortParam = sort ? `&sort=${sort}` : "";
+      const payload = await api(`${module.endpoint}?page=${page}&size=${size}${sortParam}`);
       setData(current => ({ ...current, [moduleId]: payload }));
       setErrors(current => ({ ...current, [moduleId]: "" }));
     } catch (error) {
@@ -1145,9 +1231,11 @@ function App() {
 
   return (
     <div className="app-shell">
+      <GlobalSearch modules={modules} active={active} setActive={setActive} isOpen={searchOpen} setIsOpen={setSearchOpen} />
       <Sidebar active={active} setActive={setActive} permissions={permissions} />
       <div className="workspace">
         <Topbar
+          setSearchOpen={setSearchOpen}
           user={user}
           role="Custom access"
           openLogin={logout}
@@ -1171,7 +1259,7 @@ function App() {
             <DataPage
               config={{ ...pageConfig[active], key: activeModule?.key }}
               pagePayload={data[active] || []}
-              refresh={(page, size) => loadModule(active, page, size)}
+              refresh={(page, size, sort) => loadModule(active, page, size, sort)}
               loading={loading}
               error={errors[active]}
               onCreate={createRecord}
