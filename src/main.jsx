@@ -288,7 +288,11 @@ async function downloadApiFile(path, fallbackName) {
   const headers = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(path, { headers });
+  
+  const baseUrl = import.meta.env.PROD ? "https://manufacturing-erp-1782912681254.azurewebsites.net" : "";
+  const fullPath = path.startsWith("http") ? path : baseUrl + path;
+
+  const response = await fetch(fullPath, { headers });
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   const disposition = response.headers.get("content-disposition") || "";
   const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || fallbackName;
@@ -786,9 +790,9 @@ function ReportsPage() {
   const [invoiceId, setInvoiceId] = useState("");
   const [error, setError] = useState("");
   const reports = [
-    ["Monthly Sales Summary", "Sales totals grouped by month.", "/api/reports/monthly-sales-summary.csv", "monthly-sales-summary.csv"],
-    ["Top Selling Products", "Product sales volume and revenue ranking.", "/api/reports/top-selling-products.csv", "top-selling-products.csv"],
-    ["Supplier Purchase Summary", "Purchasing totals grouped by supplier.", "/api/reports/supplier-purchase-summary.csv", "supplier-purchase-summary.csv"]
+    ["Monthly Sales Summary", "Sales totals grouped by month.", "/api/reports/monthly-sales-summary/export", "monthly-sales-summary.csv"],
+    ["Top Selling Products", "Product sales volume and revenue ranking.", "/api/reports/top-selling-products/export", "top-selling-products.csv"],
+    ["Supplier Purchase Summary", "Purchasing totals grouped by supplier.", "/api/reports/supplier-purchase-summary/export", "supplier-purchase-summary.csv"]
   ];
   async function download(path, name) {
     setError("");
@@ -802,7 +806,7 @@ function ReportsPage() {
         {reports.map(([title, description, path, name]) => (
           <div className="report-card" key={title}><FileBarChart size={22} /><div><h3>{title}</h3><p>{description}</p></div><button onClick={() => download(path, name)}><Download size={14} /> Download CSV</button></div>
         ))}
-        <div className="report-card"><FileBarChart size={22} /><div><h3>Sales Invoice</h3><p>Export the invoice for a specific sales order.</p></div><div className="report-invoice"><input type="number" min="1" placeholder="Sales order ID" value={invoiceId} onChange={e => setInvoiceId(e.target.value)} /><button disabled={!invoiceId} onClick={() => download(`/api/reports/sales-orders/${invoiceId}/invoice.csv`, `sales-invoice-${invoiceId}.csv`)}><Download size={14} /> Download</button></div></div>
+        <div className="report-card"><FileBarChart size={22} /><div><h3>Sales Invoice</h3><p>Export the invoice for a specific sales order.</p></div><div className="report-invoice"><input type="number" min="1" placeholder="Sales order ID" value={invoiceId} onChange={e => setInvoiceId(e.target.value)} /><button disabled={!invoiceId} onClick={() => download(`/api/reports/sales-orders/${invoiceId}/invoice/export`, `sales-invoice-${invoiceId}.csv`)}><Download size={14} /> Download</button></div></div>
       </div>
     </div>
   );
