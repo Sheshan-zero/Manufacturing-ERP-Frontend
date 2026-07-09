@@ -180,7 +180,7 @@ const pageConfig = {
   },
   notifications: {
     title: "Notifications", subtitle: "Queue and inspect operational email notifications.",
-    columns: ["notificationId", "recipientEmail", "subject", "status", "sourceType", "sourceId", "createdDate", "sentDate"], key: "notificationId", statusField: "status", createLabel: "Queue Notification", allowEdit: false, allowDelete: false,
+    columns: ["notificationId", "recipientEmail", "subject", "status", "sourceType", "sourceId", "createdDate", "sentDate"], key: "notificationId", statusField: "status", createLabel: "Queue Notification", allowEdit: true, allowDelete: false,
     formSections: { "Notification Details": [["recipientEmail", "Recipient email", "email"], ["subject", "Subject"], ["message", "Message", "textarea"], ["sourceType", "Source type"], ["sourceId", "Source ID", "number"]] }
   },
   auditLogs: {
@@ -267,7 +267,7 @@ function labelize(key) { return String(key).replace(/([a-z])([A-Z])/g, "$1 $2").
 function formatValue(value) {
   if (value == null) return "-";
   if (typeof value === "number" && value > 999) return value.toLocaleString();
-  if (String(value).includes("T")) return new Date(value).toLocaleDateString();
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}[T ]/.test(value)) return new Date(value).toLocaleDateString();
   return String(value);
 }
 function money(value) { return Number(value || 0).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 }); }
